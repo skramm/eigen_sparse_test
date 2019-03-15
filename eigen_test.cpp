@@ -1,7 +1,7 @@
 
 /**
-\file eigen_test_4.cpp
-\brief A speed test comparison of a bare eigen sparse matrix and a std::set wrapper
+\file eigen_test.cpp
+\brief A speed test for Eigen sparse matrices implementation
 
 
 Arguments:
@@ -60,31 +60,6 @@ struct MyClass
 
 
 
-/// a wrapper over Eigen Sparse Matrix, adds a std::set of linearized positions where the non-null values are
-template<typename T>
-struct EigenSMWrapper
-{
-	std::set<int>          _idx_set;
-	Eigen::SparseMatrix<T> _data;
-
-	EigenSMWrapper( int r, int c ): _data(r,c)
-	{}
-
-	bool isNull( int r, int c ) const
-	{
-		int idx = r * _data.cols() + c;
-		if( _idx_set.find( idx ) == _idx_set.cend() )
-			return true;
-		return false;
-	}
-	template<typename InputIterators>
-	void setFromTriplets( const InputIterators& ib, const InputIterators& ie )
-	{
-		_data.setFromTriplets( ib, ie );
-		for( auto it = ib;it != ie; ++it )
-			_idx_set.insert( it->row() * _data.cols() + it->col() );
-	}
-};
 
 
 /// Return true if element at \c row, \c col is empty
@@ -130,7 +105,30 @@ static size_t integer_pow_10( int n )
 	return r;
 }
 
-/// see eigen_test_4.cpp
+
+void
+fillMatrix( mat, matDim, nbValues );
+{
+	srand( time(0) );
+
+	std::cout << "\n1 - create Triplets\n";
+
+	Timing timing0;
+	auto tripletList = createTriplets( matDim, nbValues );
+	timing0.PrintDuration();
+
+	std::cout << "\n2 - fill sparse matrix:\n";
+
+	{
+		std::cout << " - direct\n";
+		Timing timing;
+		mat1.setFromTriplets( tripletList.begin(), tripletList.end() );
+		timing.PrintDuration();
+	}
+}
+
+
+/// see eigen_test.cpp
 int main( int argc, const char** argv )
 {
 	std::srand(time(0));
@@ -157,8 +155,9 @@ int main( int argc, const char** argv )
 
 	std::cout << "- Nb searches in matrix = " << nbSearches << '\n';
 
-	Eigen::SparseMatrix<MyClass> mat1(matDim,matDim);
-	EigenSMWrapper<MyClass>      mat2(matDim,matDim);
+	Eigen::SparseMatrix<MyClass> mat(matDim,matDim);
+
+	fillMatrix( mat, matDim, nbValues );
 
 	srand( time(0) );
 
@@ -177,12 +176,6 @@ int main( int argc, const char** argv )
 		timing.PrintDuration();
 	}
 
-	{
-		std::cout << " - using wrapper set\n";
-		Timing timing;
-		mat2.setFromTriplets( tripletList.begin(), tripletList.end() );
-		timing.PrintDuration();
-	}
 
 	{
 		std::cout << "\n3 - searching for " << nbSearches << " values in matrix...\n";
