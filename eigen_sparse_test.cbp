@@ -26,6 +26,8 @@
 		<Unit filename="build.sh" />
 		<Unit filename="eigen_test_1.cpp" />
 		<Unit filename="eigen_test_2.cpp" />
+		<Unit filename="eigen_test_3.cpp" />
+		<Unit filename="eigen_test_4.cpp" />
 		<Unit filename="timing.hpp" />
 		<Extensions>
 			<envvars />

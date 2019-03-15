@@ -1,10 +1,8 @@
 
 /**
-\file eigen_test_3.cpp
-\brief A speed test comparison of a bare eigen sparse matrix and two wrappers, one base on std::set, the other on std::vector
+\file eigen_test_4.cpp
+\brief A speed test comparison of a bare eigen sparse matrix and a std::set wrapper
 
-
-Clearly shows that std::vector is a no go...
 
 Arguments:
 -# size of matrix n (matrix will be n x n ). Default is 1000
@@ -12,14 +10,12 @@ Arguments:
 -# nb of searches performed
 */
 
-//#define USE_PAIR
 
 #include <eigen3/Eigen/SparseCore>
 #include <vector>
 #include <iostream>
 #include <set>
 #include "timing.hpp"
-
 
 
 typedef std::chrono::high_resolution_clock MyClock;
@@ -62,40 +58,21 @@ struct MyClass
 	}
 };
 
-template<typename T>
-struct Base
-{
-	Eigen::SparseMatrix<T> _data;
-	Base( int r, int c ): _data(r,c)
-	{}
-	void insertElem( int r, int c, const T& t )
-	{
-		_data.insert( r, c ) = t;
-	}
-	size_t getCols() const
-	{
-		return _data.cols();
-	}
-	template<typename InputIterators>
-	void storeData( const InputIterators& ib, const InputIterators& ie )
-	{
-		_data.setFromTriplets( ib, ie );
-	}
-};
 
 
 /// a wrapper over Eigen Sparse Matrix, adds a std::set of linearized positions where the non-null values are
 template<typename T>
-struct EigenSMWrapper_set: public Base<T>
+struct EigenSMWrapper
 {
 	std::set<int>          _idx_set;
+	Eigen::SparseMatrix<T> _data;
 
-	EigenSMWrapper_set( int r, int c ): Base<T>(r,c)
+	EigenSMWrapper( int r, int c ): _data(r,c)
 	{}
 
 	bool isNull( int r, int c ) const
 	{
-		int idx = r * Base<T>::getCols() + c;
+		int idx = r * _data.cols() + c;
 		if( _idx_set.find( idx ) == _idx_set.cend() )
 			return true;
 		return false;
@@ -103,61 +80,9 @@ struct EigenSMWrapper_set: public Base<T>
 	template<typename InputIterators>
 	void setFromTriplets( const InputIterators& ib, const InputIterators& ie )
 	{
-		Base<T>::storeData( ib, ie );
+		_data.setFromTriplets( ib, ie );
 		for( auto it = ib;it != ie; ++it )
-			_idx_set.insert( it->row() * Base<T>::getCols() + it->col() );
-	}
-};
-
-/// a wrapper over Eigen Sparse Matrix, adds a std::vector of positions where the non-null values are
-template<typename T>
-struct EigenSMWrapper_vec: public Base<T>
-{
-#ifdef USE_PAIR
-	std::vector<std::pair<int,int>> _idx_set;
-#else
-	std::vector<int>           _idx_set;
-#endif
-	EigenSMWrapper_vec( int r, int c ): Base<T>(r,c)
-	{}
-
-	bool isNull( int r, int c ) const
-	{
-#ifdef USE_PAIR
-		if(
-			std::find(
-				_idx_set.cbegin(),
-				_idx_set.cend(),
-				std::make_pair(r,c)
-			) == _idx_set.cend()
-		)
-#else
-		int idx = r * Base<T>::getCols() + c;
-		if(
-			std::find(
-				_idx_set.cbegin(),
-				_idx_set.cend(),
-				idx
-			) == _idx_set.cend()
-		)
-#endif
-			return true;
-		return false;
-	}
-	template<typename InputIterators>
-	void setFromTriplets( const InputIterators& ib, const InputIterators& ie )
-	{
-		Base<T>::storeData( ib, ie );
-
-		std::cout << "resizing vec to " << std::distance( ib, ie ) << " elems\n";
-		_idx_set.resize( std::distance( ib, ie ));
-		size_t i=0;
-		for( auto it = ib;it != ie; ++it )
-#ifdef USE_PAIR
-			_idx_set[i++] = std::make_pair( it->row(), it->col() );
-#else
-			_idx_set[i++] = ( it->row() * Base<T>::getCols() + it->col() );
-#endif
+			_idx_set.insert( it->row() * _data.cols() + it->col() );
 	}
 };
 
@@ -197,7 +122,7 @@ createTriplets( size_t mat_dim, size_t nbValues )
 	return tripletList;
 }
 
-/// see eigen_test_3.cpp
+/// see eigen_test_4.cpp
 int main( int argc, const char** argv )
 {
 	std::srand(time(0));
@@ -221,8 +146,7 @@ int main( int argc, const char** argv )
 	std::cout << "- Nb searches in matrix = " << nbSearches << '\n';
 
 	Eigen::SparseMatrix<MyClass> mat1(matDim,matDim);
-	EigenSMWrapper_set<MyClass>         mat2(matDim,matDim);
-	EigenSMWrapper_vec<MyClass>         mat3(matDim,matDim);
+	EigenSMWrapper<MyClass>      mat2(matDim,matDim);
 
 	srand( time(0) );
 
@@ -245,12 +169,6 @@ int main( int argc, const char** argv )
 		std::cout << " - using wrapper set\n";
 		Timing timing;
 		mat2.setFromTriplets( tripletList.begin(), tripletList.end() );
-		timing.PrintDuration();
-	}
-	{
-		std::cout << " - using wrapper vec\n";
-		Timing timing;
-		mat3.setFromTriplets( tripletList.begin(), tripletList.end() );
 		timing.PrintDuration();
 	}
 
@@ -281,20 +199,6 @@ int main( int argc, const char** argv )
 		std::cout << " - wrapper1 class: nbvalues=" << Nb_2 << "\n";
 		timing.PrintDuration();
 	}
-	{
-		Timing timing;
-		size_t Nb_2 = 0;
-		for( int i=0; i<nbSearches; i++ )
-		{
-			int r = 1.0*rand()/RAND_MAX * matDim;
-			int c = 1.0*rand()/RAND_MAX * matDim;
-			if( !mat3.isNull( r, c ) )
-				Nb_2++;
-		}
-		std::cout << " - wrapper2 class: nbvalues=" << Nb_2 << "\n";
-		timing.PrintDuration();
-	}
-
 }
 
 
