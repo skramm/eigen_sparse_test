@@ -18,10 +18,6 @@ Arguments:
 #include "timing.hpp"
 
 
-typedef std::chrono::high_resolution_clock MyClock;
-typedef std::chrono::time_point<MyClock> MyTimePoint;
-typedef std::chrono::duration<MyTimePoint::rep,MyTimePoint::period> MyDuration;
-
 // shouldn't change things (but who knows ?)
 constexpr int g_vec_size = 10;
 

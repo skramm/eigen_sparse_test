@@ -3,13 +3,9 @@
 \file eigen_test.cpp
 \brief A speed test for Eigen sparse matrices implementation
 
-
 Arguments:
--# size of matrix n (matrix will be n x n ). Default is 1000
--# nb of non-null values in the matrix. Default is
--# nb of searches performed
+-# sparsity coeff
 */
-
 
 #include <eigen3/Eigen/SparseCore>
 #include <vector>
@@ -17,10 +13,8 @@ Arguments:
 #include <set>
 #include "timing.hpp"
 
-
-typedef std::chrono::high_resolution_clock MyClock;
-typedef std::chrono::time_point<MyClock> MyTimePoint;
-typedef std::chrono::duration<MyTimePoint::rep,MyTimePoint::period> MyDuration;
+int g_tab_val[] = { 1, 2, 5 };
+char g_sep = ';';
 
 // shouldn't change things (but who knows ?)
 constexpr int g_vec_size = 10;
@@ -58,10 +52,6 @@ struct MyClass
 	}
 };
 
-
-
-
-
 /// Return true if element at \c row, \c col is empty
 /**
 see http://stackoverflow.com/questions/42053467/
@@ -77,9 +67,9 @@ bool isNull( const Eigen::SparseMatrix<T>& mat, int row, int col )
 	return true;
 }
 
-/// Allocate the data the will be stored randomly in matrix
-std::vector<Eigen::Triplet<MyClass>>
-createTriplets( size_t mat_dim, size_t nbValues )
+/// Fills the sparse matrix
+void
+fillMatrix( Eigen::SparseMatrix<MyClass>& mat, size_t matDim, size_t nbValues )
 {
 	std::vector<Eigen::Triplet<MyClass>> tripletList;
 	tripletList.reserve( nbValues );
@@ -89,121 +79,75 @@ createTriplets( size_t mat_dim, size_t nbValues )
 		MyClass object{ 5, 1.2 };
 		object.v.resize( g_vec_size );
 
-		int r = 1.0*rand()/RAND_MAX * mat_dim; // insert somewhere
-		int c = 1.0*rand()/RAND_MAX * mat_dim;
+		int r = 1.0*rand()/RAND_MAX * matDim; // insert somewhere
+		int c = 1.0*rand()/RAND_MAX * matDim;
 
 		tripletList.push_back( Eigen::Triplet<MyClass>( r, c, object ) );
 	}
-	return tripletList;
 }
 
-static size_t integer_pow_10( int n )
+size_t
+searchMatrix( const Eigen::SparseMatrix<MyClass>& mat, size_t matDim, size_t nbSearches )
 {
-	size_t r = 1;
-	while (n--)
-		r *= 10;
-	return r;
-}
-
-
-void
-fillMatrix( mat, matDim, nbValues );
-{
-	srand( time(0) );
-
-	std::cout << "\n1 - create Triplets\n";
-
-	Timing timing0;
-	auto tripletList = createTriplets( matDim, nbValues );
-	timing0.PrintDuration();
-
-	std::cout << "\n2 - fill sparse matrix:\n";
-
+	size_t Nb = 0;
+	for( int i=0; i<nbSearches; i++ )
 	{
-		std::cout << " - direct\n";
-		Timing timing;
-		mat1.setFromTriplets( tripletList.begin(), tripletList.end() );
-		timing.PrintDuration();
+		int r = 1.0*rand()/RAND_MAX * matDim;
+		int c = 1.0*rand()/RAND_MAX * matDim;
+		if( !isNull( mat, r, c ) )
+			Nb++;
 	}
+	return Nb;
 }
 
 
 /// see eigen_test.cpp
+/**
+arg: sparsity coeff, expressed in %: "0.1" means that if we have 1M values (1000x1000) then we will have 0.001*1M = 1000 values stored in the matrix
+*/
 int main( int argc, const char** argv )
 {
-	std::srand(time(0));
-	std::cout << "Eigen version: " << EIGEN_WORLD_VERSION << '.' << EIGEN_MAJOR_VERSION << '.' << EIGEN_MINOR_VERSION << '\n';
-	int e_matDim = 3;
+	int nbStepsSearch = 10;
+	int nbStepsMatSize = 10;
+
+//	std::srand(time(0));
+	std::cout << "# Eigen version: " << EIGEN_WORLD_VERSION << '.' << EIGEN_MAJOR_VERSION << '.' << EIGEN_MINOR_VERSION << '\n';
+
+
+	double sparsity = 0.1;
 	if( argc>1 )
-		e_matDim = std::atoi( argv[1] );
-	size_t matDim = integer_pow_10( e_matDim );
+		sparsity = std::atof( argv[1] );
+	std::cout << "# sparsity = " << sparsity << "%\n";
 
-	std::cout << "- reserve space for a sparse matrix " << matDim << " x " << matDim << '\n';
+	std::cout << "# matDim;nbValues;fill_duration;nbSearches;search_duration;nb values found\n";
 
-	int e_nbValues = 4;
-	if( argc>2 )
-		e_nbValues = std::atoi( argv[2] );
-	size_t nbValues =  integer_pow_10( e_nbValues );
-
-	std::cout << "- Nb values stored in matrix = " << nbValues << '\n';
-	std::cout << "   (sparsity ratio=" << 100.0*nbValues/matDim/matDim << "%)\n";
-
-	int e_nbSearches = 5;
-	if( argc>3 )
-		e_nbSearches = std::atoi( argv[3] );
-	size_t nbSearches =  integer_pow_10( e_nbSearches );
-
-	std::cout << "- Nb searches in matrix = " << nbSearches << '\n';
-
-	Eigen::SparseMatrix<MyClass> mat(matDim,matDim);
-
-	fillMatrix( mat, matDim, nbValues );
-
-	srand( time(0) );
-
-	std::cout << "\n1 - create Triplets\n";
-
-	Timing timing0;
-	auto tripletList = createTriplets( matDim, nbValues );
-	timing0.PrintDuration();
-
-	std::cout << "\n2 - fill sparse matrix:\n";
-
+	size_t pow1 = 100;
+	for( auto j=0; j<nbStepsMatSize; j++ )
 	{
-		std::cout << " - direct\n";
-		Timing timing;
-		mat1.setFromTriplets( tripletList.begin(), tripletList.end() );
-		timing.PrintDuration();
-	}
+		if( !(j%3) )
+			pow1 *= 10;
+		size_t matDim = g_tab_val[j%3] * pow1;
+		Eigen::SparseMatrix<MyClass> mat(matDim,matDim);
 
+		size_t nbValues = sparsity/100.0 * matDim * matDim;
 
-	{
-		std::cout << "\n3 - searching for " << nbSearches << " values in matrix...\n";
-		Timing timing;
-		size_t Nb_1 = 0;
-		for( int i=0; i<nbSearches; i++ )
+		Timing timing1;
+		fillMatrix( mat, matDim, nbValues );
+		auto durFill = timing1.getDuration().count();
+
+		size_t pow2 = 10;
+		for( auto i=0; i<nbStepsSearch; i++ )
 		{
-			int r = 1.0*rand()/RAND_MAX * matDim;
-			int c = 1.0*rand()/RAND_MAX * matDim;
-			if( !isNull( mat1, r, c ) )
-				Nb_1++;
+			if( !(i%3) )
+				pow2 *= 10;
+			size_t nbSearches = g_tab_val[i%3] * pow2;
+			Timing timing2;
+			auto n = searchMatrix( mat, matDim, nbSearches );
+			std::cout << matDim << g_sep << nbValues << g_sep << durFill << g_sep << nbSearches << g_sep << timing2.getDuration().count() << g_sep << n << '\n';
 		}
-		std::cout << "  Results:\n - direct eigen matrix: nbvalues=" << Nb_1 << "\n";
-		timing.PrintDuration();
+		std::cout << '\n';
 	}
-	{
-		Timing timing;
-		size_t Nb_2 = 0;
-		for( int i=0; i<nbSearches; i++ )
-		{
-			int r = 1.0*rand()/RAND_MAX * matDim;
-			int c = 1.0*rand()/RAND_MAX * matDim;
-			if( !mat2.isNull( r, c ) )
-				Nb_2++;
-		}
-		std::cout << " - wrapper1 class: nbvalues=" << Nb_2 << "\n";
-		timing.PrintDuration();
-	}
+
 }
 
 
