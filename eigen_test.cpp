@@ -10,6 +10,7 @@ Arguments:
 #include <eigen3/Eigen/SparseCore>
 #include <vector>
 #include <iostream>
+#include <fstream>
 #include <set>
 #include "timing.hpp"
 
@@ -59,10 +60,17 @@ see http://stackoverflow.com/questions/42053467/
 template<typename T>
 bool isNull( const Eigen::SparseMatrix<T>& mat, int row, int col )
 {
+//#ifdef COUNT_SEARCH_LOOPS
+	size_t c=0;
+//#endif
 	for( typename Eigen::SparseMatrix<T>::InnerIterator it(mat, col); it; ++it )
 	{
+		c++;
 		if( it.row() == row )
+		{
+			std::cout << "*c=*" << c << '\n';
 			return false;
+		}
 	}
 	return true;
 }
@@ -116,9 +124,13 @@ int main( int argc, const char** argv )
 	double sparsity = 0.1;
 	if( argc>1 )
 		sparsity = std::atof( argv[1] );
-	std::cout << "# sparsity = " << sparsity << "%\n";
 
-	std::cout << "# i;matDim;nbValues;fill_duration;j;nbSearches;search_duration;nb values found\n";
+
+	std::ofstream fout( "data.dat" );
+	assert( fout.is_open() );
+
+	fout << "# i;matDim;nbValues;fill_duration;j;nbSearches;search_duration;nb values found\n";
+	fout << "# sparsity = " << sparsity << "%\n";
 
 	size_t pow1 = 100;
 	for( auto j=0; j<nbStepsMatSize; j++ )
@@ -126,14 +138,16 @@ int main( int argc, const char** argv )
 		if( !(j%3) )
 			pow1 *= 10;
 		size_t matDim = g_tab_val[j%3] * pow1;
+		size_t nbValues = sparsity/100.0 * matDim * matDim;
+
 		Eigen::SparseMatrix<MyClass> mat(matDim,matDim);
 
-		size_t nbValues = sparsity/100.0 * matDim * matDim;
+		std::cout << j << ": matDim=" << matDim << 'x' << matDim << ", nb values=" << nbValues;
 
 		Timing timing1;
 		fillMatrix( mat, matDim, nbValues );
 		auto durFill = timing1.getDuration();
-//		std::cout << "j=" << j << " matDim=" << matDim << " durFill=" << durFill << "\n";
+		std::cout << ", durFill=" << durFill << " ms\n";
 		size_t pow2 = 1000;
 		for( auto i=0; i<nbStepsSearch; i++ )
 		{
@@ -142,9 +156,9 @@ int main( int argc, const char** argv )
 			size_t nbSearches = g_tab_val[i%3] * pow2;
 			Timing timing2;
 			auto n = searchMatrix( mat, matDim, nbSearches );
-			std::cout << j << g_sep << matDim << g_sep << nbValues << g_sep << durFill << g_sep << i << g_sep << nbSearches << g_sep << timing2.getDuration() << g_sep << n << '\n';
+			fout << j << g_sep << matDim << g_sep << nbValues << g_sep << durFill << g_sep << i << g_sep << nbSearches << g_sep << timing2.getDuration() << g_sep << n << '\n';
 		}
-		std::cout << '\n';
+		fout << std::endl;
 
 	}
 }
