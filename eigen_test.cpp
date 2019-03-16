@@ -107,19 +107,18 @@ arg: sparsity coeff, expressed in %: "0.1" means that if we have 1M values (1000
 */
 int main( int argc, const char** argv )
 {
-	int nbStepsSearch = 10;
-	int nbStepsMatSize = 10;
+	int nbStepsSearch = 7;
+	int nbStepsMatSize = 8;
 
-//	std::srand(time(0));
+	std::srand(time(0));
 	std::cout << "# Eigen version: " << EIGEN_WORLD_VERSION << '.' << EIGEN_MAJOR_VERSION << '.' << EIGEN_MINOR_VERSION << '\n';
-
 
 	double sparsity = 0.1;
 	if( argc>1 )
 		sparsity = std::atof( argv[1] );
 	std::cout << "# sparsity = " << sparsity << "%\n";
 
-	std::cout << "# matDim;nbValues;fill_duration;nbSearches;search_duration;nb values found\n";
+	std::cout << "# i;matDim;nbValues;fill_duration;j;nbSearches;search_duration;nb values found\n";
 
 	size_t pow1 = 100;
 	for( auto j=0; j<nbStepsMatSize; j++ )
@@ -133,9 +132,9 @@ int main( int argc, const char** argv )
 
 		Timing timing1;
 		fillMatrix( mat, matDim, nbValues );
-		auto durFill = timing1.getDuration().count();
-
-		size_t pow2 = 10;
+		auto durFill = timing1.getDuration();
+//		std::cout << "j=" << j << " matDim=" << matDim << " durFill=" << durFill << "\n";
+		size_t pow2 = 1000;
 		for( auto i=0; i<nbStepsSearch; i++ )
 		{
 			if( !(i%3) )
@@ -143,11 +142,11 @@ int main( int argc, const char** argv )
 			size_t nbSearches = g_tab_val[i%3] * pow2;
 			Timing timing2;
 			auto n = searchMatrix( mat, matDim, nbSearches );
-			std::cout << matDim << g_sep << nbValues << g_sep << durFill << g_sep << nbSearches << g_sep << timing2.getDuration().count() << g_sep << n << '\n';
+			std::cout << j << g_sep << matDim << g_sep << nbValues << g_sep << durFill << g_sep << i << g_sep << nbSearches << g_sep << timing2.getDuration() << g_sep << n << '\n';
 		}
 		std::cout << '\n';
-	}
 
+	}
 }
 
 

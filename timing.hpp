@@ -31,8 +31,11 @@ struct Timing
 			<< " ms\n";
 		initTimer();
 	}
-	MyDuration getDuration()
+	MyTimePoint::rep getDuration()
 	{
-		return std::chrono::duration_cast<std::chrono::milliseconds>(MyClock::now() - _startTime);
+	auto a = std::chrono::duration_cast<std::chrono::milliseconds>(MyClock::now() - _startTime).count();
+//	std::cout << "a=" << a.count() << "\n";
+		initTimer();
+		return a; //std::chrono::duration_cast<std::chrono::milliseconds>(MyClock::now() - _startTime).count;
 	}
 };
